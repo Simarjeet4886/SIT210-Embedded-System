@@ -1,0 +1,119 @@
+/* 
+   SIT210 - Task 4.2C (Arduino Nano 33 IoT)
+   Example: Using 2 Interrupts
+
+   - A push button on pin D2 controls LED1
+   - A PIR motion sensor on pin D3 controls LED2
+   - Interrupts are used to detect button press and motion
+   - The main loop checks events and turns LEDs on/off
+*/
+
+// --- Pin numbers ---
+const uint8_t BUTTON_PIN = 2;   // Button connected here
+const uint8_t SENSOR_PIN = 3;   // PIR sensor connected here
+const uint8_t LED1_PIN   = 5;   // LED1 connected here
+const uint8_t LED2_PIN   = 6;   // LED2 connected here
+
+// --- Flags (true/false) set by interrupts ---
+volatile bool buttonFlag = false;
+volatile bool sensorFlag = false;
+
+// --- For ignoring unwanted extra signals (debounce) ---
+unsigned long lastButtonMillis = 0;
+unsigned long lastSensorMillis = 0;
+const unsigned long DEBOUNCE_MS = 200; // wait time in ms
+
+// --- LED states (ON/OFF) ---
+bool led1State = false;
+bool led2State = false;
+
+// ============================================================
+// setup() runs once when Arduino starts
+// ============================================================
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) {}  // Wait until Serial Monitor is ready
+
+  setupPins();        // Set pins as input or output
+  attachInterrupts(); // Connect interrupts to button & sensor
+
+  Serial.println("Task4.2C started. Press button or move sensor...");
+}
+
+// ============================================================
+// loop() runs again and again
+// ============================================================
+void loop() {
+  handleButtonEvent(); // Check if button was pressed
+  handleSensorEvent(); // Check if sensor was triggered
+  delay(10);           // Short pause so CPU is not too busy
+}
+
+// ============================================================
+// setupPins() - set pin modes (input/output)
+// ============================================================
+void setupPins() {
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+  digitalWrite(LED1_PIN, LOW); // LEDs start OFF
+  digitalWrite(LED2_PIN, LOW);
+
+  pinMode(BUTTON_PIN, INPUT_PULLUP); // Button wired to GND
+  pinMode(SENSOR_PIN, INPUT);        // PIR sensor output
+}
+
+// ============================================================
+// attachInterrupts() - connect pins to their ISRs
+// ============================================================
+void attachInterrupts() {
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(SENSOR_PIN), sensorISR, RISING);
+}
+
+// ============================================================
+// handleButtonEvent() - runs when button was pressed
+// ============================================================
+void handleButtonEvent() {
+  if (buttonFlag) {  // Did the ISR say button pressed?
+    unsigned long now = millis();
+    if (now - lastButtonMillis >= DEBOUNCE_MS) {
+      lastButtonMillis = now;
+      led1State = !led1State; // Change LED1 state
+      digitalWrite(LED1_PIN, led1State ? HIGH : LOW);
+
+      Serial.print("Button -> LED1: ");
+      Serial.println(led1State ? "ON" : "OFF");
+    }
+    buttonFlag = false; // Reset flag
+  }
+}
+
+// ============================================================
+// handleSensorEvent() - runs when motion detected
+// ============================================================
+void handleSensorEvent() {
+  if (sensorFlag) {  // Did the ISR say sensor triggered?
+    unsigned long now = millis();
+    if (now - lastSensorMillis >= DEBOUNCE_MS) {
+      lastSensorMillis = now;
+      led2State = !led2State; // Change LED2 state
+      digitalWrite(LED2_PIN, led2State ? HIGH : LOW);
+
+      Serial.print("Sensor -> LED2: ");
+      Serial.println(led2State ? "ON" : "OFF");
+    }
+    sensorFlag = false; // Reset flag
+  }
+}
+
+// ============================================================
+// Interrupt Service Routines (ISRs)
+// Only set the flags here, keep it short
+// ============================================================
+void buttonISR() {
+  buttonFlag = true;  // Button pressed
+}
+
+void sensorISR() {
+  sensorFlag = true;  // Motion detected
+}
