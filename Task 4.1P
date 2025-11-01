@@ -1,0 +1,19 @@
+import RPi.GPIO as GPIO   # Importing Raspberry Pi GPIO library
+import time               # Importing time library
+
+GPIO.setmode(GPIO.BOARD)  # Using physical pin numbering
+LED_PIN = 11              # Setting the variable LED_PIN to GPIO17
+
+GPIO.setup(LED_PIN, GPIO.OUT)  # Configure GPIO17 as an output pin
+
+try:
+    while True:                          # Creating an infinite loop to blink continuously
+        GPIO.output(LED_PIN, GPIO.HIGH)  # Turning the LED ON 
+        time.sleep(1)                    # Now, wait for 1 second
+        GPIO.output(LED_PIN, GPIO.LOW)   # Turning the LED OFF
+        time.sleep(1)                    # Waiting for 1 second before repeating
+
+except KeyboardInterrupt:                # Catching the keyboard interrupt
+    pass                                 # Exiting the loop safely
+finally:
+    GPIO.cleanup()                       # This resets all the GPIO pins to their default state
