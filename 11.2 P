@@ -1,0 +1,163 @@
+#include <LiquidCrystal.h>
+#include <Keypad.h>
+#include <Servo.h>
+
+// ---------------- LCD ----------------
+LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
+
+// ---------------- KEYPAD ----------------
+const byte ROWS = 4;
+const byte COLS = 4;
+
+byte rowPins[ROWS] = {A1, A2, A3, A4};
+byte colPins[COLS] = {A5, A6, 9, 13};
+
+char keys[ROWS][COLS] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+};
+
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+// ---------------- SERVO ----------------
+Servo myServo;
+int servoPin = 10;
+
+// ---------------- SENSORS & OUTPUTS ----------------
+int vibrationPin = A0;
+int buzzerPin = 12;
+int redLEDPin = 8;
+int greenLEDPin = 11;
+
+// ---------------- BLUETOOTH ----------------
+String receivedData = "";
+String registeredUserCode = "SIMAR123";
+
+// ---------------- OTP ----------------
+String generatedOTP = "";
+
+void setup() {
+  Serial.begin(9600);
+  lcd.begin(16, 2);
+
+  myServo.attach(servoPin);
+  myServo.write(0);
+
+  pinMode(buzzerPin, OUTPUT);
+  pinMode(redLEDPin, OUTPUT);
+  pinMode(greenLEDPin, OUTPUT);
+  pinMode(vibrationPin, INPUT);
+
+  lcd.print("SMART LOCKER");
+  delay(2000);
+  lcd.clear();
+}
+
+// ---------------- RANDOM OTP GENERATOR ----------------
+String createOTP() {
+  String otp = "";
+  for (int i = 0; i < 4; i++) otp += String(random(0, 10));
+  return otp;
+}
+
+// ---------------- GET 4 DIGIT FROM KEYPAD ----------------
+String getInput() {
+  String input = "";
+  lcd.setCursor(0, 1);
+
+  while (input.length() < 4) {
+    char key = keypad.getKey();
+    if (key >= '0' && key <= '9') {
+      input += key;
+      lcd.print("*");
+      delay(150);
+    }
+  }
+  return input;
+}
+
+// ---------------- VIBRATION ALERT ----------------
+void vibrationAlert() {
+  lcd.clear();
+  lcd.print("ALERT! VIBRATION");
+  lcd.setCursor(0, 1);
+  lcd.print("INTRUDER DETECTED");
+
+  // ---- FAST RED LED + BUZZER BLINK ----
+  for (int i = 0; i < 30; i++) {   // 30 rapid blinks
+    digitalWrite(buzzerPin, HIGH);
+    digitalWrite(redLEDPin, HIGH);
+    delay(60);
+
+    digitalWrite(buzzerPin, LOW);
+    digitalWrite(redLEDPin, LOW);
+    delay(60);
+  }
+}
+
+void loop() {
+
+  // ---- Vibration Detection ----
+  if (analogRead(vibrationPin) > 600) {
+    vibrationAlert();
+  }
+
+  // ---- Step 1: Bluetooth User Login ----
+  lcd.clear();
+  lcd.print("Send BT Code");
+
+  receivedData = "";
+  while (receivedData == "") {
+    if (Serial.available()) {
+      receivedData = Serial.readStringUntil('\n');
+      receivedData.trim();
+    }
+  }
+
+  // ---- Step 2: Check User Identity ----
+  if (receivedData == registeredUserCode) {
+    lcd.clear();
+    lcd.print("User Verified");
+    delay(1000);
+
+    // ---- Generate and Send OTP ----
+    generatedOTP = createOTP();
+    Serial.println("Your OTP is: " + generatedOTP);
+    lcd.clear();
+    lcd.print("OTP Sent!");
+    delay(2000);
+  } else {
+    lcd.clear();
+    lcd.print("Unknown User");
+    delay(2000);
+    return;
+  }
+
+  // ---- Step 3: Ask OTP ----
+  lcd.clear();
+  lcd.print("Enter OTP:");
+  String userOTP = getInput();
+
+  // ---- Step 4: Validate OTP ----
+  if (userOTP == generatedOTP) {
+    lcd.clear();
+    lcd.print("ACCESS GRANTED");
+
+    digitalWrite(greenLEDPin, HIGH);
+    myServo.write(90);
+    delay(3000);
+
+    myServo.write(0);
+    digitalWrite(greenLEDPin, LOW);
+  } else {
+    lcd.clear();
+    lcd.print("WRONG OTP");
+    lcd.setCursor(0, 1);
+    lcd.print("TRY AGAIN");
+    delay(2000);
+  }
+
+  delay(500);
+}
